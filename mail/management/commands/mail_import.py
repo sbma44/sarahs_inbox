@@ -17,7 +17,8 @@ class Command(BaseCommand):
 
         count = 0
         success = 0
-        for filename in os.listdir(path):
+        
+        for filename in sorted(os.listdir(path)):
             f = open('%s%s' % (path, filename), 'r')
             lines = f.readlines()
             f.close()

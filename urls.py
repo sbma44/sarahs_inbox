@@ -17,3 +17,4 @@ if settings.DEBUG:
     urlpatterns += patterns('', (r'^%s(?P<path>.*)$' % _media_url, serve, { 'document_root': settings.MEDIA_ROOT }))
        
 urlpatterns += patterns('', (r'^', include('mail.urls')))
+urlpatterns += patterns('', (r'^', include('mail_dedupe.urls')))

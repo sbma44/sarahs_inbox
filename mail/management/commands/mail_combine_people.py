@@ -22,13 +22,14 @@ class Command(BaseCommand):
 
         return victims
     
-    def handle(self, *args, **options):
-        target = Person.objects.get(id=args[0])
+    def merge(self, target_id, victim_ids, noprint=False):
+        
+        target = Person.objects.get(id=target_id)
         target.merged_into = None
         target.save()
         
         victim_final = []
-        victims = list(args[1:])
+        victims = list(victim_ids)
         victims = self.expand_victim_list(victims)
         name_list = []
         email_count = 0
@@ -65,9 +66,15 @@ class Command(BaseCommand):
                 
             p.merged_into = target
             p.save()
-                
-        print "Combined %s into the %s account, affecting %d emails" % (", ".join(name_list), target.name, email_count)
+        
+        if noprint:        
+            return (", ".join(name_list), target.name, email_count)
+        else:
+            print "Combined %s into the %s account, affecting %d emails" % (", ".join(name_list), target.name, email_count)
                 
         
                 
-            
+    def handle(self, *args, **options):
+        target_id = args[0]
+        victim_ids = args[1:]
+        self.merge(target_id, victim_ids)

@@ -12,13 +12,13 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'elenas_inbox.sqlite3'
+        'NAME': 'sarahs_inbox.sqlite3'
     }
 }
 
 ADMIN_MEDIA_PREFIX = 'http://assets.sunlightfoundation.com/admin/8961/'
 
-HAYSTACK_SEARCH_ENGINE = 'solr'
+HAYSTACK_SEARCH_ENGINE = 'haystack'
 HAYSTACK_SOLR_URL = 'http://morgan.sunlightlabs.org:8080/solr/core_kagan'
 HAYSTACK_SEARCH_RESULTS_PER_PAGE = 20
 HAYSTACK_SITECONF = 'search_sites'
@@ -106,6 +106,7 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.messages',
     'mail',
+    'mail_dedupe',
     'mediasync',
     'haystack',
 )

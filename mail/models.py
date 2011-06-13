@@ -53,11 +53,11 @@ class Person(models.Model):
     def is_kagan(self):
         return self.id==KAGAN_ID
         
-    def save(self):
+    def save(self, *args, **kwargs):
         self.name_hash = Email.objects.make_name_hash(self.name)
         self.is_merged = not(self.merged_into is None)
         self.slug = slugify_unique(Person, self.name)
-        super(Person, self).save()                
+        super(Person, self).save(*args, **kwargs)                
     
     name = models.CharField("Name", max_length=255, blank=True, default='')
     name_hash = models.CharField("Name", max_length=255, blank=True, default='')    
@@ -139,150 +139,127 @@ class Thread(models.Model):
     
 class EmailManager(models.Manager):
 
-    def _compile_re(self, d, abbrev):
-        for k in d:
-            d[k] = re.compile(d[k].replace('_XX_', abbrev))
-        return d
-
     def __init__(self):
         self.count = 0 # target looks to be 4777; email splitting currently at 4766
         self.success = 0
         self.failure = 0
         
         name_chars = r'[A-Za-z_\s\.\'\-\,]'
-        self.re_gremlins = re.compile(r'[\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xab\xbb\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xae]')
+        self.re_gremlins = re.compile(r'[\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xab\xbb\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xae\x80]')
         self.re_non_alpha = re.compile(r'[^A-Z]')
         self.re_re = re.compile(r'([^\s]*re\:\s?)+', re.I)
-        self.re_to = {
-            'detector': r'^.?\s*.?_XX_:',
-            'first': r'(%s+)\s+\(?\s*[cC]N[\~;:=](%s+[=\/])' % (name_chars, name_chars),
-            'second': r'^.?\s*.?_XX_:\s+(%s+)\s{3,}' % name_chars,
-            'third': r'^.?\s*.?_XX_:\s+"?(%s+)"?\s*[\<\(\@]' % name_chars,
-            'fourth': r'^.?\s*.?_XX_:\s+(%s+)' % name_chars,
-            # 'fifth': r'^.?\s*.?_XX_:\s+"?(%s+)"?\s*[\<\@]' % name_chars,
-            'alias_ats': r'^.?\s*.?_XX_:\s+([A-Z_\s]+)\s+\([\w\@]',   
-            'combo': r'([\w\s\.\'\-]+)\s+([A-Z_\s]+)'         
+
+        self.re_from= {
+            'detector': re.compile(r'^\s*Fro(m|rn)\s*:', re.I),
+            'extractor': re.compile(r'Fro[mrn]{1,2}\s*:\s*(.*?)\s*$', re.I),
         }
-        self.re_cc = self.re_to.copy()
-        self.re_bcc = self.re_to.copy()
-        self.re_creator = self.re_to.copy()
 
-        self.re_to = self._compile_re(self.re_to, 'TO')
-        self.re_cc = self._compile_re(self.re_cc, 'CC')
-        self.re_bcc = self._compile_re(self.re_bcc, 'BCC')
-        self.re_creator = self._compile_re(self.re_creator, 'CREATOR')
+        self.re_to = {
+            'detector': re.compile(r'^\s*To\s*:', re.I),
+            'extractor': re.compile(r'To\s*:\s*(.*?)\s*$', re.I),
+        }
+        self.re_cc = {
+            'detector': re.compile(r'^\s*Cc\s*:', re.I),
+            'extractor': re.compile(r'Cc\s*:\s*(.*?)\s*$', re.I),
+        }
 
-        self.re_subject = re.compile(r'^\s*.?SUBJECT:(.*)')
-        self.re_creation_date = re.compile(r'CREATI(O|0|o\.)N\s+[DO]AT[eE][j\/\!]TIME:(.+)')
+
+        self.re_subject = re.compile(r'^\s*Subject\s*:(.*)', re.I)
+        
+        self.re_creation_date = re.compile(r'^\s*Sent\s*:\s*(.*?)$', re.I)
         self.re_attachment_start = re.compile(r'^([^=;]*)[=:;\s]{5,}ATTACHMENT')
         self.re_attachment_end = re.compile(r'^([^=;]*)[=;\s]{5,}END\s+ATTACHMENT')        
-        
+                
         super(EmailManager, self).__init__()
 
     def make_name_hash(self, t):
-        return self.re_non_alpha.sub('',t.strip().upper())
+        return unicode(self.re_non_alpha.sub('', re.sub(r'\s+', r' ', t.strip().upper())))
 
     def make_subject_hash(self, t):
-        return self.re_re.sub('', t.strip())
+        return self.re_re.sub('', re.sub('\s+', '', t.strip())).upper()
 
-    def grab_name_and_alias(self, line, regex=None):
+    def grab_name(self, line, regex=None):
 
         if regex is None:
             regex = self.re_to
 
-        line_s = line.strip().replace('"','')
+        line_s = self._zap_gremlins(line.strip().replace('"',''))
 
         name = None
-        alias = None
-        m = regex['first'].search(line_s)
+        m = regex['extractor'].search(line_s)
         if m is not None:
-            name = m.group(1).strip()
-        else:
-            m = regex['second'].search(line_s)
-            if m is not None:
-                if m.group(1).strip().upper()==m.group(1).strip():
-                    alias = m.group(1).strip()
-                else:
-                    name = m.group(1).strip()
-            else:
-                m = regex['third'].search(line_s)
-                if m is not None:
-                    if m.group(1).strip().upper()==m.group(1).strip():
-                        alias = m.group(1).strip()
-                    else:
-                        name = m.group(1).strip()
-                else:
-                    m = regex['fourth'].search(line_s)
-                    if m is not None:
-                        if m.group(1).strip().upper()==m.group(1).strip():
-                            alias = m.group(1).strip()
-                        else:
-                            name = m.group(1).strip()
-                    else:
-                        # m = regex['fifth'].search(line_s)
-                        # if m is not None:
-                        #     name = m.group(1)
-                        # else:
-                        m = regex['alias_ats'].search(line_s)
-                        if m is not None:
-                            alias = m.group(1).strip()
+            name = m.group(1).strip()       
 
-        return (name, alias)
+        return name
 
-    def _extract_person(self, line, regex=None):
+    def _extract_people(self, line, allow_multiple=True, regex=None):
 
         if regex is None:
             regex = self.re_to
 
-        (name, alias) = self.grab_name_and_alias(line, regex)
-              
-        p = None
-        if name:
-            m = regex['combo'].search(name)
-            if m is not None:
-                name = m.group(1).strip()
-                alias = m.group(2).strip()
-        
-            (p, created) = Person.objects.get_or_create(name=name, defaults={'alias': (alias is not None) and alias or '', 'name_hash': self.make_name_hash(name)})
-            if (not created) and len(p.alias)==0 and alias:
-                p.alias = alias
-                p.save()
+        name = self.grab_name(line, regex)
+        if allow_multiple:
             
-            return p
+            # remove single quotes, where possible
+            name = re.sub(r'\'([\w\s@\.]+)\'', r'\1', name)
             
-        elif alias:
-            try:
-                (p, created) = Person.objects.get_or_create(alias=alias)
-            except Person.MultipleObjectsReturned, e:
-                p = Person.objects.filter(alias=alias)[0]
-            return p
+            # fix names like Nizich; Michael A (GOV)
+            name = re.sub(r'([\w\s]+);\s*([\w\s]+)\s+(\([A-Z]{3,5}\))', r'\2 \1 \3', name)
             
+            # name = re.sub(r'([>\)]);', r'\1#!@!#', name)
+            # name = re.sub(r'\'([\w+]@[\w+])\';', r'\1#!@!#', name)
+            # name = re.sub(r'([\w+]@[\w+]);', r'\1#!@!#', name)
+
+            names = re.split(r';', name)
+
+            # names = map(lambda x: re.sub(r'([\s\w]+)[;,]\s*([\s\w]+)(\([A-Z]+\))', r'\2 \1 \3', x.strip()), names)
+
+            names = map(lambda x: re.sub(r'\s+', ' ', x), names)
+            names = map(lambda x: re.sub(r'(^\s+|\s+$)', '', x), names)
+
         else:
-            return None
+            names = [name]
+        
+        alias = None
+        p = None
+        if len(names):
+            people = []        
+            for name in names:                
+                (p, created) = Person.objects.get_or_create(name=unicode(name), defaults={'alias': (alias is not None) and alias or '', 'name_hash': self.make_name_hash(name)})            
+                people.append(p)
+            return people
+        else:
+            return []
             self.failure += 1
                         
     def _zap_gremlins(self, t):
         return self.re_gremlins.sub("", t)
           
-    
     def _clean_date(self, t):
-    
-        def _trans(d):
-            return d.replace('199S','1998').replace('199B','1998').replace('l', '1').replace('i','1').replace('I','1').replace('B', '8').replace('O', '0').replace('S', '5')
-        t = t.replace('0CT', 'OCT').replace('5EP', 'SEP').replace('~', '-').replace("'",'').replace(': ',':')
-        parts = t.split('-')
-        parts[0] = _trans(parts[0])
-        if len(parts)>=3:
-            parts[2] = _trans(parts[2])
-        t = '-'.join(parts)
+        t = t.replace('_', '')
+        t = re.sub(r'\W(\d{4})(\d{1,2})\W',r'\1 \2',t)
+        t = re.sub(r'(\d{2})\s*:\s*(\d{2})\s*:\s*(\d{2})', r'\1:\2:\3', t)
+        t = t.replace(';', ':')
+        t = re.sub(r'([AP]).(M)', r'\1\2', t)
         return t
-  
+
+    def _ignore_line(self, l):
+        if re.search(r'www.CrivellaWest.com', l, re.I):
+            return True
+        if re.search(r'\s+PRA.*?GSP', l, re.I):
+            return True
+        if re.match(r'^\s*\d{1,2}\s*$', l):
+            return True
+        return False
+    
     def parse_text(self, source_id, source_file, lines):
         self.count += 1
+        self.source_id = source_id
         
         candidate_date = ''
         found_creator = False
         found_to = False
+        found_cc = False
         found_date = False
         found_subject = False
         found_text = False
@@ -298,36 +275,44 @@ class EmailManager(models.Manager):
         
         for line in lines:
 
+            just_found_subject = False
+
             # creator
-            if (not found_creator) and (self.re_creator['detector'].search(line) is not None):
-                p = self._extract_person(line, regex=self.re_creator)
-                if p is not None:
-                    E.creator = p
+            if (not found_creator) and (self.re_from['detector'].search(line) is not None):
+                found_people = self._extract_people(line, regex=self.re_from, allow_multiple=False)
+                if len(found_people)>0:
+                    for p in found_people:
+                        E.creator = p
                     found_creator = True            
 
             # to
-            if self.re_to['detector'].search(line) is not None:
-                p = self._extract_person(line)
-                if p is not None:
-                    E_to.append(p)
+            if (not found_to) and self.re_to['detector'].search(line) is not None:
+                found_people = self._extract_people(line, allow_multiple=True)                
+                if len(found_people)>0:
+                    for p in found_people:
+                        E_to.append(p)
                     found_to = True
 
             # cc
-            if self.re_cc['detector'].search(line) is not None:
-                p = self._extract_person(line, regex=self.re_cc)
-                if p is not None:
-                    E_cc.append(p)
+            if (not found_cc) and self.re_cc['detector'].search(line) is not None:
+                found_people = self._extract_people(line, regex=self.re_cc, allow_multiple=True)
+                if len(found_people)>0:
+                    for p in found_people:
+                        E_cc.append(p)
+                found_cc = True
 
             # creation date/time
-            m = self.re_creation_date.search(line)
-            if (not found_date) and (m is not None):
-                candidate_date = m.group(2).strip()
-                candidate_date = self._clean_date(candidate_date)
+            date_match = self.re_creation_date.search(line)
+            if (not found_date) and date_match is not None:
+                candidate_date = self._clean_date(date_match.group(1).strip())
+                # perform some cleanup on the candidate date
+                
                 try:
                     E.creation_date_time = parser.parse(candidate_date)
                     found_date = True
                 except:
-                    pass
+                    print "Date parsing failure on %s: %s" % (self.source_id, candidate_date)
+                    found_date = False
 
             # subject
             m = self.re_subject.search(line)
@@ -335,9 +320,10 @@ class EmailManager(models.Manager):
                 E.subject = unicode(self._zap_gremlins(m.group(1).strip()), 'utf-8')
                 E.subject_hash = self.make_subject_hash(E.subject)
                 found_subject = True
+                just_found_subject = True
             
             # text
-            if line.strip()=="TEXT:":
+            if found_subject and found_date and found_to and found_creator:
                 collecting_text = True
                 found_text = True
             
@@ -352,12 +338,8 @@ class EmailManager(models.Manager):
             if self.re_attachment_end.search(line) is not None:
                 collecting_attachment = False
                 
-            if collecting_text: 
-                if line.strip()!="TEXT:": # don't collect the text marker itself
-                    E.text += unicode(self._zap_gremlins(line), 'utf-8')
-                
-            if collecting_attachment:
-                E.attachment += unicode(self._zap_gremlins(line), 'utf-8')
+            if collecting_text and not just_found_subject and not self._ignore_line(line): 
+                E.text += unicode(self._zap_gremlins(line), 'utf-8')
                 
                 
         if found_to and found_subject and found_text and found_date and found_creator:            
@@ -440,7 +422,7 @@ class Email(models.Model):
     subject = models.CharField("Subject", max_length=255, default='', blank=True)
     subject_hash = models.CharField("Subject Hash", max_length=255, default='', blank=True)
     to = models.ManyToManyField(Person, related_name='to', blank=True)
-    cc = models.ManyToManyField(Person, null=True, related_name='cc')
+    cc = models.ManyToManyField(Person, null=True, blank=True, related_name='cc')
     text = models.TextField('Text', default='', blank=True)
     attachment = models.TextField('Attachment', default='', blank=True)
     source = models.TextField('Source', default='', blank=True)

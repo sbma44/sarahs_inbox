@@ -54,11 +54,14 @@ class Command(NoArgsCommand):
                                 choice = buf[int(choice_num)]
 
                                 other_ids = [choice.id]
+                                other_names = []
                                 for x in buf:
                                     if x.id!=choice.id:
+                                        other_names.append(x.name)
                                         other_ids.append(x.id)
 
-                                print "merging %s into %s" % (map(lambda x: int(x), other_ids), choice.name)
+                                # print "merging %s into %s" % (map(lambda x: int(x), other_ids), choice.name)
+                                print "merging %s into %s" % (", ".join(other_names), choice.name)
 
                                 call_command('mail_combine_people', *other_ids)                    
                 
