@@ -18,8 +18,8 @@ DATABASES = {
 
 ADMIN_MEDIA_PREFIX = 'http://assets.sunlightfoundation.com/admin/8961/'
 
-HAYSTACK_SEARCH_ENGINE = 'haystack'
-HAYSTACK_SOLR_URL = 'http://morgan.sunlightlabs.org:8080/solr/core_kagan'
+HAYSTACK_SEARCH_ENGINE = 'dummy'
+HAYSTACK_SOLR_URL = ''
 HAYSTACK_SEARCH_RESULTS_PER_PAGE = 20
 HAYSTACK_SITECONF = 'search_sites'
 
@@ -31,7 +31,7 @@ HAYSTACK_SITECONF = 'search_sites'
 # timezone as the operating system.
 # If running in a Windows environment this must be set to the same as your
 # system time zone.
-TIME_ZONE = 'America/Eastern'
+TIME_ZONE = 'America/New_York'
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
