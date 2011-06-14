@@ -41,6 +41,9 @@ class PersonManager(models.Manager):
     def elena_kagan(self):
         return Person.objects.get(id=KAGAN_ID)
 
+    def sarah_palin(self):
+        return Person.objects.filter(name__icontains='Governor Sarah Palin')
+
 class Person(models.Model):
     """ A sender or recipient of emails """
     def __unicode__(self):
