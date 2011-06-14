@@ -78,8 +78,8 @@ def _annotate_emails(emails, search=[]):
 def index(request, search=[], threads=None):
     
     if threads is None:
-        kagan = Person.objects.elena_kagan()
-        threads = Thread.objects.exclude(creator=kagan).order_by('-date')        
+        palin = Person.objects.sarah_palin()
+        threads = Thread.objects.exclude(creator__in=palin).order_by('-date')
 
     threads_count = threads.count()
         
