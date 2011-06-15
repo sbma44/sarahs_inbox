@@ -51,8 +51,12 @@ def _highlight(text, tokens):
     return text
 
 
-def _prepare_ids_from_cookie(request, cookie_name):
-    cookie = unquote(request.COOKIES.get(cookie_name,'')).replace(',,', ',')
+def _prepare_ids_from_cookie(request, cookie_name, method=None):
+    if method == 'post':
+        cookie = unquote(request.POST.get(cookie_name, '')).replace(',,', ',')
+    else:
+        cookie = unquote(request.COOKIES.get(cookie_name,'')).replace(',,', ',')
+    print cookie
     if len(cookie)>1:
         if cookie[0]==',':
             cookie = cookie[1:]
@@ -223,7 +227,10 @@ def star_record_ajax(request, thread_id, action):
 
 
 def starred(request):
-    starred_ids = _prepare_ids_from_cookie(request, 'kagan_star')
+    if not request.POST.get('kagan_star'):
+        return HttpResponseRedirect(reverse('mail.views.index'))
+
+    starred_ids = _prepare_ids_from_cookie(request, 'kagan_star', method='post')
     if len(starred_ids)==0:
         return HttpResponseRedirect(reverse('mail.views.index'))
     

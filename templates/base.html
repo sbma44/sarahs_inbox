@@ -17,12 +17,20 @@
     _gaq.push(['_setAllowLinker', true]);
     _gaq.push(['_trackPageview']);
 
+    $(document).ready(function () {
+        $("#showstarred").bind('click', function () {
+            var cookie = $.cookie('kagan_star');
+            $("input#kagan_star").val(cookie);
+            $("form#starredbyme").submit();
+        });
+    });
+
     (function() {
       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
       var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
     })();
-    
+
     function RecordID(cookie_name, id) {
       var current_cookie = $.cookie(cookie_name);
       if (current_cookie===null)
