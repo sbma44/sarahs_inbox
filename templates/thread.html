@@ -26,7 +26,7 @@ var starred = GetArrayOfIDs('kagan_star');
   <div class="entry_body_top"></div>
   <div class="entry_body" id="email-{{ email.obj.id }}">
   	{% if forloop.first %}<script type="text/javascript">document.write((IsMarked(starred, '{{ thread.id }}')) ? '<a href="#" rel="{{ thread.id }}" class="star on"></a>' : '<a href="#" rel="{{ thread.id }}" class="star"></a>');</script>{% endif %}
-  	<h1><a href="/thread/{{ thread.id }}/#email-{{ email.obj.id }}" rel="bookmark" title="Permanent Link to '{{ email.obj.subject }}'">{{ email.obj.subject }}</a></h1><span class="entry_date">{{ email.obj.creation_date_time|date:"f A d M Y" }}</span>
+    <h1><a href="/thread/{{ thread.id }}/#email-{{ email.obj.id }}" rel="bookmark" title="Permanent Link to '{{ email.obj.subject }}'">{{ email.obj.subject }}</a></h1><span class="entry_date">{{ email.obj.creation_date_time|date:"f A d M Y" }} [ <a target="_blank" href="http://rawdata.sarahsinbox.com/{{ email.obj.source_id }}.pdf">View original</a> ]</span>
     <table class="addressees">
 
       {% if email.creator_html %}
